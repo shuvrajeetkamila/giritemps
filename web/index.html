@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>AERIAL TEMPEST — 3D Air Combat</title>
+<meta name="description" content="Aerial Tempest: a fully procedural 3D aerial combat game — open world, dynamic weather, 5 aircraft, 10 campaign missions." />
+<!-- dev import map: lets a plain static server (tools/serve.mjs) run the source
+     tree without a bundler. Vite ignores this and resolves `three` itself. -->
+
+<script type="importmap">
+{ "imports": { "three": "./node_modules/three/build/three.module.js" } }
+</script>
+  <script type="module" crossorigin src="./assets/index-Bs_B0rMD.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/three-Doaya2Jk.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-BB6Hvfce.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game-canvas"></canvas>
+  <canvas id="hud-canvas"></canvas>
+  <div id="vfx-overlay"></div>
+
+  <div id="loading-screen">
+    <div class="load-inner">
+      <div class="load-title">AERIAL TEMPEST</div>
+      <div class="load-sub">PROCEDURAL COMBAT FLIGHT SIMULATOR</div>
+      <div class="load-bar"><div class="load-bar-fill" id="load-fill"></div></div>
+      <div class="load-status" id="load-status">INITIALIZING…</div>
+      <div class="load-hint">Tip: press <b>ESC</b> any time for the menu · <b>F1</b> for controls</div>
+    </div>
+  </div>
+
+  <div id="ui-root"></div>
+  <div id="toast-layer"></div>
+</div>
+</body>
+</html>
