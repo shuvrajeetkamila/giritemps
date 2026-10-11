@@ -1,5 +1,6 @@
 // Keyboard, mouse and gamepad input with remappable bindings and deadzones.
 import { loadSettings } from './settings.js';
+import { touchDown, touchPressed, endTouchFrame } from '../ui/touch.js';
 
 const keys = new Set();
 const pressed = new Set();     // edge-triggered this frame
@@ -34,6 +35,7 @@ export function requestMouseLock(canvas) {
 }
 
 export function isDown(action) {
+  if (touchDown(action)) return true;
   const s = loadSettings();
   const code = s.bindings[action];
   if (!code) return false;
@@ -43,6 +45,7 @@ export function isDown(action) {
 }
 
 export function wasPressed(action) {
+  if (touchPressed(action)) return true;
   const s = loadSettings();
   const code = s.bindings[action];
   if (code && pressed.has(code)) return true;
@@ -107,6 +110,7 @@ export function pollInput() {
 
 // Call at end of frame to clear edge-triggered presses.
 export function endInputFrame() {
+  endTouchFrame();
   pressed.clear();
 }
 

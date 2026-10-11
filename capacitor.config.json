@@ -1,0 +1,6 @@
+{
+  "appId": "com.giritemps.game",
+  "appName": "GIRITEMPS",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#05080a" }
+}

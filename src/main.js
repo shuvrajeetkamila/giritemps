@@ -5,6 +5,7 @@ import { loadSettings } from './core/settings.js';
 import { AudioEngine } from './audio/audio.js';
 import { Game } from './game/game.js';
 import { UI } from './ui/ui.js';
+import { initTouch } from './ui/touch.js';
 import { AIRFIELD } from './world/layout.js';
 
 const canvas = document.getElementById('game');
@@ -12,6 +13,7 @@ const hudCanvas = document.getElementById('hud');
 const uiRoot = document.getElementById('ui');
 
 initInput(canvas);
+initTouch();
 const audio = new AudioEngine();
 let ui = null;
 const game = new Game({ canvas, hudCanvas, audio, emit: (ev, data) => ui && ui.onGameEvent(ev, data) });

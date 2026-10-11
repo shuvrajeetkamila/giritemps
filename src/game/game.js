@@ -19,6 +19,7 @@ import { AIRCRAFT } from '../physics/aircraft-data.js';
 import { stallWarning } from '../physics/flight.js';
 import { HUD } from '../ui/hud.js';
 import { isDown, wasPressed, pollInput, endInputFrame } from '../core/input.js';
+import { touchAxis, touchThrottle, setTouchVisible } from '../ui/touch.js';
 import { loadSettings, getQuality } from '../core/settings.js';
 import { MISSIONS, TIME_HOURS, missionById } from './missions.js';
 import { loadProfile, saveProfile, addXp, recordMission, recordArcade, isAircraftUnlocked } from './profile.js';
@@ -615,10 +616,14 @@ export class Game {
       const lt = gp.buttons[6] ? gp.buttons[6].value : 0;
       if (lt > 0.05) p.fm.throttle = clamp(lt, 0, 1);
     }
+    const ta = touchAxis();
+    pitch += ta.pitch; roll += ta.roll;
     pitch = clamp(pitch, -1, 1); roll = clamp(roll, -1, 1); yaw = clamp(yaw, -1, 1);
     this.playerInp = { pitch, roll, yaw };
 
     // Throttle, afterburner, brake, gear, flaps.
+    const tt = touchThrottle();
+    if (tt !== null) p.fm.throttle = tt;
     if (isDown('throttleUp')) p.fm.throttle = clamp(p.fm.throttle + dt * 0.6, 0, 1);
     if (isDown('throttleDown')) p.fm.throttle = clamp(p.fm.throttle - dt * 0.6, 0, 1);
     if (wasPressed('afterburner')) p.afterburner = !p.afterburner;
@@ -1144,6 +1149,7 @@ export class Game {
     this.updateCamera(dt);
     this.updateEnvironment(dt);
     this.updatePostFx(dt);
+    setTouchVisible(this.mode === 'flight' && !this.paused && !!this.session && !this.session.over);
     const hs = this.mode === 'flight' && this.player ? this.buildHudState() : { hudVisible: false };
     this.hud.draw(hs, dt);
     if (this.mode === 'flight' && this.view === 'cockpit' && this.player) {

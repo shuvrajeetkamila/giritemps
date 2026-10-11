@@ -1,0 +1,73 @@
+name: Android APK
+
+on:
+  push:
+    branches: [arena/dde5404c-giritemps, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Create and sync Android project
+        run: |
+          [ -d android ] || npx cap add android
+          npx cap sync android
+          node scripts/android-setup.mjs
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk GIRITEMPS-${{ github.run_number }}-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: giritemps-apk-${{ github.run_number }}
+          path: GIRITEMPS-${{ github.run_number }}-debug.apk
+          retention-days: 30
+
+      - name: Publish downloadable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "apk-build-${{ github.run_number }}" \
+            "GIRITEMPS-${{ github.run_number }}-debug.apk" \
+            --target "${{ github.sha }}" \
+            --prerelease \
+            --title "GIRITEMPS Android APK #${{ github.run_number }}" \
+            --notes "Debug APK built from commit ${{ github.sha }}. Enable 'Install unknown apps' on your phone to sideload."
