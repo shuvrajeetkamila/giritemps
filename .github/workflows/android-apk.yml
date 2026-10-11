@@ -29,8 +29,6 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
-
       - name: Install dependencies
         run: npm ci
 
@@ -48,8 +46,11 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
           chmod +x gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
           ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Name the APK
