@@ -263,31 +263,57 @@ export class Game {
 
   _spawnGroundTargets(def) {
     const rng = new RNG(9182 + (def.center.x | 0));
-    const place = (type, count, radius, team = 'red') => {
-      for (let i = 0; i < count; i++) {
-        let x = 0, z = 0, ok = false;
-        for (let tries = 0; tries < 60; tries++) {
-          const a = rng.float(0, TAU), r = Math.sqrt(rng.float(0.04, 1)) * radius;
-          x = def.center.x + Math.cos(a) * r;
-          z = def.center.z + Math.sin(a) * r;
-          const h = this.terrain.heightAt(x, z);
-          if (h > 12 && h < 900 && this.terrain.isFlatGround(x, z, 0.16, 8, 900)) { ok = true; break; }
-        }
-        if (!ok) { x = def.center.x + rng.float(-radius, radius); z = def.center.z + rng.float(-radius, radius); }
-        const g = new GroundTarget({
-          type, team, world: this.world, seed: rng.int(1, 99999),
-          pos: new THREE.Vector3(x, Math.max(2, this.terrain.heightAt(x, z)), z)
-        });
-        this.scene.add(g.group);
-        this.targets.push(g);
+    /** find a flat spot near (cx, cz); returns null when the ground is too rough */
+    const flatSpot = (cx, cz, radius) => {
+      for (let tries = 0; tries < 60; tries++) {
+        const a = rng.float(0, TAU), r = Math.sqrt(rng.float(0.04, 1)) * radius;
+        const x = cx + Math.cos(a) * r;
+        const z = cz + Math.sin(a) * r;
+        const h = this.terrain.heightAt(x, z);
+        if (h > 12 && h < 900 && this.terrain.isFlatGround(x, z, 0.16, 8, 900)) return { x, z };
       }
+      return null;
+    };
+    const spawnAt = (type, x, z, team = 'red') => {
+      const g = new GroundTarget({
+        type, team, world: this.world, seed: rng.int(1, 99999),
+        pos: new THREE.Vector3(x, Math.max(2, this.terrain.heightAt(x, z)), z)
+      });
+      this.scene.add(g.group);
+      this.targets.push(g);
+      return g;
+    };
+    const place = (type, count, radius, team = 'red') => {
+      const made = [];
+      for (let i = 0; i < count; i++) {
+        const spot = flatSpot(def.center.x, def.center.z, radius);
+        const x = spot ? spot.x : def.center.x + rng.float(-radius, radius);
+        const z = spot ? spot.z : def.center.z + rng.float(-radius, radius);
+        made.push(spawnAt(type, x, z, team));
+      }
+      return made;
     };
     if (def.radar) place('radar', def.radar, def.spread * 0.9);
     if (def.sam) place('sam', def.sam, def.spread * 0.7);
     if (def.aaa) place('aaa', def.aaa, def.spread * 0.8);
     if (def.hangar) place('hangar', def.hangar, def.spread * 0.6);
-    if (def.depot) place('depot', def.depot, def.spread * 0.5);
-    if (def.fuelTank) place('fuelTank', def.fuelTank, def.spread * 0.45);
+    const depots = def.depot ? place('depot', def.depot, def.spread * 0.5) : [];
+    if (def.fuelTank) {
+      // Fuel tanks belong to a depot: park them inside the chain-reaction radius
+      // (120 m) so a hit on the depot actually takes the tank farm with it.
+      // Without a depot in the mission they just scatter like any other site.
+      if (depots.length) {
+        for (let i = 0; i < def.fuelTank; i++) {
+          const dep = depots[i % depots.length];
+          const spot = flatSpot(dep.pos.x, dep.pos.z, 108);
+          const x = spot ? spot.x : dep.pos.x + rng.float(-100, 100);
+          const z = spot ? spot.z : dep.pos.z + rng.float(-100, 100);
+          spawnAt('fuelTank', x, z);
+        }
+      } else {
+        place('fuelTank', def.fuelTank, def.spread * 0.45);
+      }
+    }
     if (def.command) place('command', def.command, def.spread * 0.3);
     if (def.bridge) place('bridge', def.bridge, def.spread);
     this.world.targets = this.targets;

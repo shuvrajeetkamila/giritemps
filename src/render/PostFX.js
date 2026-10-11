@@ -67,6 +67,16 @@ export class PostFX {
     this.rtGod = null;
     this.rtLens = null;
     this.quality = 2;
+    // Can this context actually render into a half-float target?  WebGL2 only
+    // guarantees RGBA8 unless EXT_color_buffer_float (or the half-float variant)
+    // is present.  Without it the HDR chain renders black, so fall back to 8-bit
+    // and keep the exposure/tonemap maths (the range is just clipped earlier).
+    const gl = renderer.getContext ? renderer.getContext() : null;
+    const ext = gl && gl.getExtension
+      ? (gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'))
+      : null;
+    this.hdr = !!(gl && gl.RGBA16F) && (!!ext || !!(gl.getExtension && gl.getExtension('EXT_float_blend')));
+    if (!this.hdr) this.hdrType = THREE.UnsignedByteType; else this.hdrType = THREE.HalfFloatType;
     this._initPasses();
   }
 
@@ -75,7 +85,7 @@ export class PostFX {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
-      type: opts.half === false ? THREE.UnsignedByteType : THREE.HalfFloatType,
+      type: opts.half === false ? THREE.UnsignedByteType : this.hdrType,
       depthBuffer: opts.depth !== false,
       stencilBuffer: false,
       generateMipmaps: false,
@@ -344,7 +354,7 @@ export class PostFX {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
-      type: THREE.HalfFloatType,
+      type: this.hdrType,
       depthBuffer: true,
       depthTexture: depthTex,
       stencilBuffer: false,
@@ -357,7 +367,7 @@ export class PostFX {
     this.rtSky?.dispose();
     this.rtSky = new THREE.WebGLRenderTarget(sw, sh, {
       minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat, type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat, type: this.hdrType,
       depthBuffer: false, stencilBuffer: false, colorSpace: THREE.NoColorSpace
     });
 

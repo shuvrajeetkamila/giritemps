@@ -61,7 +61,9 @@ function fatal(err) {
 class App {
   constructor() {
     this.settings = new Settings();
-    this.clock = new THREE.Clock();
+    // frame timing: THREE.Clock is deprecated in three 0.186 (and it only wraps
+    // performance.now anyway), so keep the two numbers ourselves
+    this._timePrev = 0;
     this.cameraMode = 'chase';
     this.cameraIndex = 1;
     this.nightVision = false;
@@ -262,7 +264,7 @@ class App {
     this.ui.showMain();
     loadingScreen.classList.add('hidden');
     setTimeout(() => loadingScreen.classList.add('hidden'), 400);
-    this.clock.start();
+    this._timePrev = performance.now() / 1000;
     this.loop();
   }
 
@@ -422,6 +424,15 @@ class App {
     if (mode !== 'cockpit' && this.game.player) {
       // keep the interior hidden from outside
     }
+  }
+
+  /** Does this context support rendering into half-float targets?  (Needed by
+   *  PMREMGenerator; RGBA16F render targets are otherwise unusable.) */
+  _probeFloatTargets() {
+    const gl = this.renderer && this.renderer.getContext ? this.renderer.getContext() : null;
+    const has = !!(gl && (gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float')));
+    this.hdrRenderTargets = has;
+    return has;
   }
 
   // -----------------------------------------------------------------------
@@ -585,13 +596,28 @@ class App {
     const tex = new THREE.CanvasTexture(c);
     tex.mapping = THREE.EquirectangularReflectionMapping;
     tex.colorSpace = THREE.SRGBColorSpace;
-    if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
-    try {
-      const rt = this.pmrem.fromEquirectangular(tex);
-      if (this.envRT) this.envRT.dispose();
-      this.envRT = rt;
-      this.scene.environment = rt.texture;
-    } catch (e) { /* ignore env map failures */ }
+    // PMREM prefilters into an RGBA16F target, which WebGL2 only allows with
+    // EXT_color_buffer_float (near-universal, but not guaranteed).  Without it
+    // the prefilter output is undefined, so use the plain equirect texture as
+    // the environment instead - the IBL is blurrier but nothing breaks.
+    if (this.hdrRenderTargets === undefined) this._probeFloatTargets();
+    if (this.hdrRenderTargets) {
+      if (!this.pmrem) this.pmrem = new THREE.PMREMGenerator(this.renderer);
+      try {
+        const rt = this.pmrem.fromEquirectangular(tex);
+        if (this.envRT) this.envRT.dispose();
+        this.envRT = rt;
+        this.scene.environment = rt.texture;
+      } catch (e) { /* ignore env map failures */ }
+    } else {
+      // No float targets: *any* scene.environment texture makes the renderer
+      // prefilter it into PMREM internally (which is exactly what cannot work
+      // here), so drop the environment map and let the hemisphere/ambient
+      // lights carry the sky bounce instead.
+      if (this.envRT) { this.envRT.dispose(); this.envRT = null; }
+      this.scene.environment = null;
+      return;
+    }
     tex.dispose();
   }
 
@@ -771,8 +797,11 @@ class App {
   loop() {
     const tick = () => {
       this.raf = requestAnimationFrame(tick);
-      let dt = this.clock.getDelta();
-      if (dt > 0.1) dt = 0.1;
+      const now = performance.now() / 1000;
+      let dt = now - this._timePrev;
+      this._timePrev = now;
+      if (!(dt > 0)) dt = 1 / 60;                 // first frame / clock went backwards
+      if (dt > 0.1) dt = 0.1;                     // never take a huge sim step
       try {
         this.update(dt);
         this.render();

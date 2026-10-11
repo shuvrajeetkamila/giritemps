@@ -57,7 +57,15 @@ const GL_PARAMS = {
   SAMPLES: 4, UNPACK_ALIGNMENT: 4, PACK_ALIGNMENT: 4
 };
 
+// GL enum constants must be *stable* objects: three.js compares a captured
+// draw mode against gl.POINTS / gl.LINES / ... by identity, and handing out a
+// fresh proxy on every property access makes every such check fail (which shows
+// up as a "WebGLInfo: Unknown draw mode" console.error per draw call).
+const enumCache = new Map();
+
 function enumProxy(name) {
+  const hit = enumCache.get(name);
+  if (hit) return hit;
   const target = function () { };
   const t = new Proxy(target, {
     get(tt, k) {
@@ -71,6 +79,7 @@ function enumProxy(name) {
     set() { return true; }
   });
   t[Symbol.toPrimitive] = () => 1;
+  enumCache.set(name, t);
   return t;
 }
 
@@ -168,11 +177,23 @@ class StubElement extends StubCanvas {
   addEventListener() {} removeEventListener() {}
   insertBefore(c) { this.children.unshift(c); return c; }
   removeChild(c) { this.children = this.children.filter((x) => x !== c); return c; }
-  remove() {}
+  // A real node detaches itself on remove(); code that prunes a list while it
+  // is still too long (UI.showToast does exactly that) would otherwise loop
+  // forever against a stub whose children never shrink.
+  remove() {
+    const p = this.parentNode;
+    if (p && p.children && p.children.includes(this)) {
+      p.children.splice(p.children.indexOf(this), 1);
+    }
+    this.parentNode = null;
+  }
   querySelector() { return null; }
   querySelectorAll() { return []; }
   focus() {} blur() {} click() {}
   get firstChild() { return this.children[0] || null; }
+  get lastChild() { return this.children[this.children.length - 1] || null; }
+  get childNodes() { return this.children; }
+  get childElementCount() { return this.children.length; }
 }
 
 export function installDomStubs() {

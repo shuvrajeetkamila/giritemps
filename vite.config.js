@@ -14,5 +14,12 @@ export default defineConfig({
       }
     }
   },
-  server: { host: '0.0.0.0', port: 5173, strictPort: false }
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: false,
+    // the sandbox proxies previews from *.e2b.app and *.arena.ai hosts; vite
+    // otherwise answers 403 "Blocked request. This host is not allowed."
+    allowedHosts: ['.e2b.app', '.arena.ai', '.localhost']
+  }
 });

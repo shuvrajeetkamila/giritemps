@@ -3,6 +3,14 @@
 import { installDomStubs } from './dom-stub.mjs';
 
 export async function bootApp(opts = {}) {
+  // src/main.js is an ES module, so it is evaluated once per process no matter
+  // how many times it is imported: a second bootApp() would silently hand back
+  // the *first* app (with its old mission and UI state).  Fail loudly instead,
+  // and put scenarios that need a fresh app in their own process.
+  if (globalThis.__AERIAL_BOOTED__) {
+    throw new Error('bootApp() already ran in this process - ESM caching means a second call returns the same app. Run the scenario in a separate node process (or restart the state through the app API).');
+  }
+  globalThis.__AERIAL_BOOTED__ = true;
   if (!globalThis.document) {
     installDomStubs();
     globalThis.WebGL2RenderingContext = class WebGL2RenderingContext { };
